@@ -1,0 +1,196 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <title>Connections Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <style>
+        /* Layout */
+        body, html {
+        margin: 0;
+        height: 100%;
+        font-family: Arial, sans-serif;
+        }
+        #app {
+        display: flex;
+        height: 100vh;
+        }
+        aside {
+        width: 300px;
+        background: #fff;
+        border-right: 1px solid #ddd;
+        padding: 1rem;
+        overflow-y: auto;
+        }
+        #map {
+        flex: 1;
+        }
+
+        /* Sidebar styling */
+        h1 {
+        font-size: 1.2rem;
+        margin-bottom: .5rem;
+        }
+        .connection {
+        border: 1px solid #eee;
+        padding: .5rem;
+        border-radius: .5rem;
+        margin-bottom: .5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        }
+        .connection-info {
+        font-size: 0.85rem;
+        }
+        .btn {
+        padding: .2rem .5rem;
+        border-radius: .25rem;
+        border: none;
+        cursor: pointer;
+        font-size: 0.75rem;
+        }
+        .btn-remove {
+        background: #fee2e2;
+        color: #b91c1c;
+        }
+        .btn-focus {
+        background: #dbeafe;
+        color: #1d4ed8;
+        }
+
+        /* Avatar marker styling */
+        .avatar-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6ee7b7, #3b82f6);
+        color: white;
+        font-weight: bold;
+        font-size: 14px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+    </style>
+    </head>
+    <body>
+    <div id="app">
+    <aside>
+        <h1>Connections Map</h1>
+        <p>Click on the map to add a new connection.</p>
+        <h2>Connections</h2>
+        <div id="connections"></div>
+    </aside>
+    <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+    // User (you)
+    const user = { id: "me", name: "You", lat: 32.7767, lng: -96.7970 };
+    const connections = [
+        { id: 1, name: "Ava", lat: 32.7801, lng: -96.8003, note: "Friend" },
+        { id: 2, name: "Liam", lat: 32.7468, lng: -96.8236, note: "Co-worker" },
+    ];
+    let nextId = 3;
+
+    // Map setup
+    const map = L.map("map").setView([user.lat, user.lng], 11);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    // Avatar icon generator
+    function createAvatarIcon(label) {
+        return L.divIcon({
+        html: `<div class="avatar-icon">${label}</div>`,
+        className: "",
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
+        popupAnchor: [0, -20]
+        });
+    }
+
+    // Render connections list
+    function renderConnections() {
+        const container = document.getElementById("connections");
+        container.innerHTML = "";
+        connections.forEach(c => {
+        const div = document.createElement("div");
+        div.className = "connection";
+        div.innerHTML = `
+            <div class="connection-info">
+            <strong>${c.name}</strong><br/>
+            <small>${c.note || ""} • ${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}</small>
+            </div>
+            <div>
+            <button class="btn btn-focus" onclick="focusConnection(${c.id})">Focus</button>
+            <button class="btn btn-remove" onclick="removeConnection(${c.id})">Remove</button>
+            </div>
+        `;
+        container.appendChild(div);
+        });
+    }
+
+    // Add markers
+    const markers = {};
+    function addMarker(conn) {
+        const marker = L.marker([conn.lat, conn.lng], {
+        icon: createAvatarIcon(conn.name[0].toUpperCase())
+        }).addTo(map);
+
+        marker.bindPopup(`<b>${conn.name}</b><br/>${conn.note || ""}`);
+        markers[conn.id] = marker;
+
+        // Draw line
+        const line = L.polyline([[user.lat, user.lng], [conn.lat, conn.lng]], {
+        color: "#3b82f6",
+        weight: 2,
+        dashArray: "6,6"
+        }).addTo(map);
+        marker._line = line;
+    }
+
+    // Remove marker
+    function removeConnection(id) {
+        const idx = connections.findIndex(c => c.id === id);
+        if (idx > -1) {
+        const conn = connections[idx];
+        map.removeLayer(markers[conn.id]);
+        map.removeLayer(markers[conn.id]._line);
+        delete markers[conn.id];
+        connections.splice(idx, 1);
+        renderConnections();
+        }
+    }
+
+    // Focus map on connection
+    function focusConnection(id) {
+        const conn = connections.find(c => c.id === id);
+        if (conn) map.setView([conn.lat, conn.lng], 12);
+    }
+
+    // Init
+    // Add user marker
+    L.marker([user.lat, user.lng], { icon: createAvatarIcon("U") })
+        .addTo(map)
+        .bindPopup("<b>You</b>");
+
+    connections.forEach(c => addMarker(c));
+    renderConnections();
+
+    // Click to add
+    map.on("click", function(e) {
+        const name = prompt("Enter connection name:");
+        if (!name) return;
+        const note = prompt("Enter note (friend, coworker, etc.):") || "";
+        const conn = { id: nextId++, name, lat: e.latlng.lat, lng: e.latlng.lng, note };
+        connections.push(conn);
+        addMarker(conn);
+        renderConnections();
+    });
+    </script>
+    </body>
+    </html>
